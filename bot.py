@@ -1,47 +1,46 @@
 import os
 import random
 import string
-
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
+# Загружаем токен из .env
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
-def generate_password(length: int, use_special: bool = True) -> str:
-    chars = string.ascii_letters + string.digits
-    if use_special:
-        chars += "!@#$%^&*()_+=-{}[]<>?"
+# Функция генерации пароля
+def generate_password(length: int) -> str:
+    chars = string.ascii_letters + string.digits + "!@#$%^&*()"
     return ''.join(random.choice(chars) for _ in range(length))
 
-def get_keyboard(length, use_special):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Сгенерировать", callback_data=f"regen:{length}:{int(use_special)}")],
-        [
-            InlineKeyboardButton("➕ длина", callback_data=f"len:{length+1}:{int(use_special)}"),
-            InlineKeyboardButton("➖ длина", callback_data=f"len:{max(4, length-1)}:{int(use_special)}"),
-        ],
-        [
-            InlineKeyboardButton(
-                "❌ Спецсимволы" if use_special else "✔ Спецсимволы",
-                callback_data=f"spec:{length}:{int(not use_special)}"
-            )
-        ]
-    ])
-
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Привет! Я генератор паролей.\n"
-        "Можешь использовать кнопки или написать /password 12",
-        reply_markup=get_keyboard(12, True)
+        "Привет! Я бот-генератор паролей.\nНапиши /password 12"
     )
 
+# Команда /password
 async def password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        return await update.messag
+        await update.message.reply_text("Использование: /password <длина>")
+        return
+    try:
+        length = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Длина должна быть числом.")
+        return
+    pwd = generate_password(length)
+    await update.message.reply_text(f"Ваш пароль: `{pwd}`", parse_mode="Markdown")
+
+# Главная функция запуска бота
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("password", password))
+
+    print("Бот запущен и ждёт сообщений...")
+    app.run_polling()  # <- без asyncio.run, на Windows работает корректно
+
+if __name__ == "__main__":
+    main()
